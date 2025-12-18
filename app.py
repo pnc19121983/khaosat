@@ -10,12 +10,12 @@ genai.configure(api_key="AIzaSyBvuuNnTfBHZbkfiNF5eC56ZQ1VtTpjRlM")
 
 def generate_analysis(prompt_text):
     try:
-        with st.spinner("🔍 Đang phân tích..."):
+        with st.spinner("🔍 AI đang đọc dữ liệu và phân tích..."):
             model = genai.GenerativeModel("gemini-2.5-flash")
             default_instruction = (
-                "Hãy phân tích dữ liệu điểm thi này. Đưa ra nhận xét về sự chênh lệch giữa các đơn vị, "
-                "xác định các đơn vị có kết quả tốt nhất và các đơn vị cần cải thiện. "
-                "Đề xuất hướng khắc phục cụ thể.\n\n"
+                "Bạn là chuyên gia phân tích dữ liệu giáo dục. Hãy nhận xét về dữ liệu điểm thi này. "
+                "Xác định các đơn vị xuất sắc, các đơn vị cần cải thiện, và đề xuất giải pháp cụ thể "
+                "phù hợp với cấp học tương ứng.\n\n"
             )
             response = model.generate_content(default_instruction + str(prompt_text))
             return response.text
@@ -24,12 +24,11 @@ def generate_analysis(prompt_text):
 
 # --- HÀM HỖ TRỢ CUỘN NGANG ---
 def st_plt_scrollable(fig, width_px):
-    """Chuyển biểu đồ thành HTML có thanh cuộn ngang"""
     tmpfile = BytesIO()
     fig.savefig(tmpfile, format='png', bbox_inches='tight')
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
     html = f"""
-    <div style="overflow-x: auto; white-space: nowrap; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+    <div style="overflow-x: auto; white-space: nowrap; border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
         <img src="data:image/png;base64,{encoded}" style="width: {width_px}px; max-width: none;">
     </div>
     """
@@ -44,9 +43,7 @@ st.title("📘 PHÂN TÍCH KẾT QUẢ KHÁO SÁT GIỮA NĂM HỌC 2025 - 2026"
 # Sidebar
 st.sidebar.header("🔎 Cấu hình hiển thị")
 chart_zoom = st.sidebar.slider("🔍 Độ dài thanh cuộn (Pixel)", 1000, 5000, 1500, step=100)
-st.sidebar.info("💡 Kéo thanh trượt trên để tăng độ dài vùng chứa biểu đồ nếu có quá nhiều trường.")
 
-# Chế độ quản trị
 admin_mode = st.sidebar.checkbox("Chế độ quản trị")
 if admin_mode:
     password = st.sidebar.text_input("Mật khẩu", type="password")
@@ -66,10 +63,9 @@ try:
     df.columns = df.columns.str.strip()
     df['Điểm thi'] = pd.to_numeric(df['Điểm thi'], errors='coerce')
 except:
-    st.error("❌ Không tìm thấy dữ liệu mẫu.")
+    st.error("❌ Không tìm thấy dữ liệu mẫu (du_lieu_mau.xlsx).")
     st.stop()
 
-# Bộ lọc trường
 school_options = ["Toàn tỉnh"] + sorted(df['Đơn vị'].dropna().unique().tolist())
 selected_school = st.sidebar.selectbox("Chọn phạm vi phân tích:", school_options)
 df_filtered = df if selected_school == "Toàn tỉnh" else df[df['Đơn vị'] == selected_school]
@@ -78,38 +74,29 @@ df_filtered = df if selected_school == "Toàn tỉnh" else df[df['Đơn vị'] =
 # PHẦN 1: CẤP THPT
 # =========================================================================
 st.subheader("🏫 Phần 1: Biểu đồ điểm trung bình cấp THPT")
-
 avg_by_school = df_filtered.groupby("Đơn vị")['Điểm thi'].mean()
 avg_all = df_filtered['Điểm thi'].mean()
 plot_data = avg_by_school.copy()
 plot_data["Trung bình toàn bộ"] = avg_all
 plot_data = plot_data.sort_values(ascending=False)
 
-labels = []
-rank = 1
-for name in plot_data.index:
-    if name == "Trung bình toàn bộ": labels.append("Trung bình")
-    else:
-        labels.append(f"{rank}. {name}")
-        rank += 1
-
+labels = [f"{i+1}. {n}" if n != "Trung bình toàn bộ" else n for i, n in enumerate(plot_data.index)]
 colors = ['orange' if n == "Trung bình toàn bộ" else 'skyblue' for n in plot_data.index]
 
-fig1, ax1 = plt.subplots(figsize=(20, 7)) # Cố định size trong bộ nhớ
+fig1, ax1 = plt.subplots(figsize=(20, 7))
 bars = ax1.bar(labels, plot_data.values, color=colors)
 for bar in bars:
     height = bar.get_height()
     ax1.text(bar.get_x() + bar.get_width()/2, height + 0.1, f"{height:.2f}", ha='center', rotation=90)
-
 ax1.set_ylim(0, 10)
 plt.xticks(rotation=90)
 plt.tight_layout()
 
-# HIỂN THỊ CÓ THANH CUỘN
 st_plt_scrollable(fig1, chart_zoom)
 
-if st.checkbox("📌 Nhận xét AI cho Phần 1", key="ai1"):
-    st.markdown(generate_analysis(f"Dữ liệu THPT: {plot_data.to_dict()}"))
+if st.checkbox("📌 Nhận xét AI cho cấp THPT", key="ai1"):
+    st.markdown("### 🧠 Đánh giá từ AI (THPT):")
+    st.markdown(generate_analysis(f"Dữ liệu điểm thi cấp THPT: {plot_data.to_dict()}"))
 
 # =========================================================================
 # PHẦN 3: CẤP THCS
@@ -132,13 +119,20 @@ try:
 
     fig3, ax3 = plt.subplots(figsize=(20, 7))
     bars3 = ax3.bar(labels_thcs, plot_thcs.values, color=colors_thcs)
+    for bar in bars3:
+        height = bar.get_height()
+        ax3.text(bar.get_x() + bar.get_width()/2, height + 0.1, f"{height:.2f}", ha='center', rotation=90)
     ax3.set_ylim(0, 10)
     plt.xticks(rotation=90)
     plt.tight_layout()
 
     st_plt_scrollable(fig3, chart_zoom)
+
+    if st.checkbox("📌 Nhận xét AI cho cấp THCS", key="ai3"):
+        st.markdown("### 🧠 Đánh giá từ AI (THCS):")
+        st.markdown(generate_analysis(f"Dữ liệu điểm thi cấp THCS: {plot_thcs.to_dict()}"))
 except:
-    st.warning("⚠️ Chưa có dữ liệu cấp THCS.")
+    st.warning("⚠️ Chưa có dữ liệu hoặc lỗi file 'du_lieu_mau_thcs.xlsx'.")
 
 # =========================================================================
 # PHẦN 4: CẤP TIỂU HỌC
@@ -160,14 +154,21 @@ try:
     colors_th = ['orange' if n == "Trung bình" else 'violet' for n in plot_th.index]
 
     fig4, ax4 = plt.subplots(figsize=(25, 7))
-    ax4.bar(labels_th, plot_th.values, color=colors_th)
+    bars4 = ax4.bar(labels_th, plot_th.values, color=colors_th)
+    for bar in bars4:
+        height = bar.get_height()
+        ax4.text(bar.get_x() + bar.get_width()/2, height + 0.1, f"{height:.2f}", ha='center', rotation=90)
     ax4.set_ylim(0, 10)
     plt.xticks(rotation=90)
     plt.tight_layout()
 
     st_plt_scrollable(fig4, chart_zoom)
+
+    if st.checkbox("📌 Nhận xét AI cho cấp Tiểu học", key="ai4"):
+        st.markdown("### 🧠 Đánh giá từ AI (Tiểu học):")
+        st.markdown(generate_analysis(f"Dữ liệu điểm thi cấp Tiểu học: {plot_th.to_dict()}"))
 except:
-    st.warning("⚠️ Chưa có dữ liệu cấp Tiểu học.")
+    st.warning("⚠️ Chưa có dữ liệu hoặc lỗi file 'du_lieu_mau_th.xlsx'.")
 
 # =========================================================================
 # PHẦN 2: CHI TIẾT THEO LỚP
@@ -175,15 +176,22 @@ except:
 st.divider()
 st.subheader("📊 Phần 2: Chi tiết theo Lớp (Cấp THPT)")
 list_schools = sorted(df['Đơn vị'].dropna().unique().tolist())
-selected_schools_p2 = st.multiselect("Chọn trường:", options=list_schools)
+selected_schools_p2 = st.multiselect("Chọn trường muốn phân tích lớp:", options=list_schools)
 
 if selected_schools_p2:
     df_p2 = df[df['Đơn vị'].isin(selected_schools_p2)]
     avg_by_class = df_p2.groupby(['Đơn vị', 'Lớp'])['Điểm thi'].mean().reset_index()
+    
     for school in selected_schools_p2:
         school_data = avg_by_class[avg_by_class['Đơn vị'] == school].sort_values(by='Điểm thi', ascending=False)
         st.write(f"#### 🏫 Trường: {school}")
+        
         fig2, ax2 = plt.subplots(figsize=(10, 5))
         ax2.bar(school_data['Lớp'], school_data['Điểm thi'], color='mediumseagreen')
         ax2.set_ylim(0, 10)
+        plt.tight_layout()
         st.pyplot(fig2)
+        
+        if st.checkbox(f"📌 AI nhận xét lớp của trường {school}", key=f"ai_class_{school}"):
+            st.markdown(f"**🧠 Nhận định AI về {school}:**")
+            st.markdown(generate_analysis(f"Dữ liệu các lớp thuộc trường {school}: {school_data.to_dict()}"))
