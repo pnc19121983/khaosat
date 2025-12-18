@@ -42,7 +42,7 @@ st.title("📘 PHÂN TÍCH KẾT QUẢ KHÁO SÁT GIỮA NĂM HỌC 2025 - 2026"
 
 # Sidebar
 st.sidebar.header("🔎 Cấu hình hiển thị")
-chart_zoom = st.sidebar.slider("🔍 Độ dài thanh cuộn (Pixel)", 1000, 5000, 1500, step=100)
+chart_zoom = st.sidebar.slider("🔍 Độ dài thanh cuộn (Pixel)", 1000, 5000, 1000, step=100)
 
 admin_mode = st.sidebar.checkbox("Chế độ quản trị")
 if admin_mode:
